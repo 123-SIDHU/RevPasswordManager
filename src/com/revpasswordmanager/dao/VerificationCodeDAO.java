@@ -1,67 +1,61 @@
 package com.revpasswordmanager.dao;
 
 import com.revpasswordmanager.model.VerificationCode;
-import com.revpasswordmanager.util.DBUtil;
 
 import java.sql.*;
-        import java.time.LocalDateTime;
 
 public class VerificationCodeDAO {
+    private Connection connection;
 
-    public void saveOTP(VerificationCode vc) {
-        String sql = "INSERT INTO verification_codes (user_id, code, purpose, expiry_time) VALUES (?, ?, ?, ?)";
+    public VerificationCodeDAO(Connection connection) {
+        this.connection = connection;
+    }
 
-        try (Connection con = DBUtil.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setInt(1, vc.getUserId());
-            ps.setString(2, vc.getCode());
-            ps.setString(3, vc.getPurpose());
-            ps.setTimestamp(4, Timestamp.valueOf(vc.getExpiryTime()));
-            ps.executeUpdate();
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+    public void create(VerificationCode verificationCode) throws SQLException {
+        String sql = "INSERT INTO verification_codes (user_id, code, purpose, expiry_time, is_used) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, verificationCode.getUserId());
+            pstmt.setString(2, verificationCode.getCode());
+            pstmt.setString(3, verificationCode.getPurpose());
+            pstmt.setTimestamp(4, verificationCode.getExpiryTime());
+            pstmt.setInt(5, verificationCode.isUsed() ? 1 : 0);
+            pstmt.executeUpdate();
         }
     }
 
-    public boolean validateOTP(int userId, String otp, String purpose) {
-        String sql = """
-                SELECT id, expiry_time FROM verification_codes
-                WHERE user_id=? AND code=? AND purpose=? AND is_used=0
-                """;
-
-        try (Connection con = DBUtil.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setInt(1, userId);
-            ps.setString(2, otp);
-            ps.setString(3, purpose);
-
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-                LocalDateTime expiry = rs.getTimestamp("expiry_time").toLocalDateTime();
-                if (expiry.isBefore(LocalDateTime.now())) {
-                    return false;
+    public VerificationCode getByCodeAndUser(String code, int userId) throws SQLException {
+        String sql = "SELECT * FROM verification_codes WHERE code = ? AND user_id = ? AND is_used = 0 AND expiry_time > CURRENT_TIMESTAMP";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, code);
+            pstmt.setInt(2, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new VerificationCode(
+                            rs.getInt("id"),
+                            rs.getInt("user_id"),
+                            rs.getString("code"),
+                            rs.getString("purpose"),
+                            rs.getTimestamp("expiry_time"),
+                            rs.getBoolean("is_used"),
+                            rs.getTimestamp("created_at"));
                 }
-                markAsUsed(rs.getInt("id"));
-                return true;
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
         }
-        return false;
+        return null;
     }
 
-    private void markAsUsed(int id) throws SQLException {
-        String sql = "UPDATE verification_codes SET is_used=1 WHERE id=?";
-        try (Connection con = DBUtil.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            ps.executeUpdate();
+    public void markAsUsed(int id) throws SQLException {
+        String sql = "UPDATE verification_codes SET is_used = 1 WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    public void cleanupExpired() throws SQLException {
+        String sql = "DELETE FROM verification_codes WHERE expiry_time < CURRENT_TIMESTAMP";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.executeUpdate();
         }
     }
 }
-

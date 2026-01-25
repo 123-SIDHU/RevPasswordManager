@@ -2,25 +2,51 @@ package com.revpasswordmanager.service;
 
 import com.revpasswordmanager.dao.VerificationCodeDAO;
 import com.revpasswordmanager.model.VerificationCode;
+import com.revpasswordmanager.util.DatabaseConnection;
 
-import java.time.LocalDateTime;
-import java.util.Random;
+import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 
 public class OTPService {
-
-    private final VerificationCodeDAO dao = new VerificationCodeDAO();
+    private static final int OTP_LENGTH = 6;
+    private static final long OTP_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes
+    private SecureRandom random = new SecureRandom();
 
     public String generateOTP(int userId, String purpose) {
-        String otp = String.valueOf(100000 + new Random().nextInt(900000));
-        LocalDateTime expiry = LocalDateTime.now().plusMinutes(5);
+        StringBuilder otp = new StringBuilder();
+        for (int i = 0; i < OTP_LENGTH; i++) {
+            otp.append(random.nextInt(10));
+        }
 
-        VerificationCode vc = new VerificationCode(userId, otp, purpose, expiry);
-        dao.saveOTP(vc);
+        Timestamp expiryTime = new Timestamp(System.currentTimeMillis() + OTP_VALIDITY_MS);
+        VerificationCode code = new VerificationCode(userId, otp.toString(), purpose, expiryTime);
 
-        return otp;
+        Connection connection = DatabaseConnection.getConnection();
+        try {
+            VerificationCodeDAO dao = new VerificationCodeDAO(connection);
+            dao.create(code);
+            return otp.toString();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
-    public boolean verifyOTP(int userId, String otp, String purpose) {
-        return dao.validateOTP(userId, otp, purpose);
+    public boolean validateOTP(int userId, String code, String purpose) {
+        Connection connection = DatabaseConnection.getConnection();
+        try {
+            VerificationCodeDAO dao = new VerificationCodeDAO(connection);
+            VerificationCode validCode = dao.getByCodeAndUser(code, userId);
+
+            if (validCode != null && validCode.getPurpose().equals(purpose)) {
+                dao.markAsUsed(validCode.getId());
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
