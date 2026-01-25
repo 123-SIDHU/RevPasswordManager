@@ -1,18 +1,19 @@
 package com.revpasswordmanager.controller;
 
-import com.revpasswordmanager.controller.UserAccount;
+import com.revpasswordmanager.model.UserAccount;
 import com.revpasswordmanager.service.IUserAccountService;
+import com.revpasswordmanager.service.UserAccountServiceImpl;
 
 import java.util.List;
 
 public class UserAccountController {
 
-    private static IUserAccountService userAccountService=new UserAccountServiceImpl();
+    private static IUserAccountService userAccountService = new UserAccountServiceImpl();
+
     public boolean addUserAccount(UserAccount userAccount) {
 
         return userAccountService.addUserAccount(userAccount);
     }
-
 
     public boolean updateUserAccount(UserAccount userAccount) {
         return false;
@@ -22,11 +23,9 @@ public class UserAccountController {
         return false;
     }
 
-
     public UserAccount getUserAccount(int userId) {
         return null;
     }
-
 
     public List<UserAccount> getAllUserAccounts() {
         return List.of();

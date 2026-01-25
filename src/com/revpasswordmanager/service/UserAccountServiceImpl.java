@@ -6,32 +6,32 @@ import com.revpasswordmanager.model.UserAccount;
 
 import java.util.List;
 
-public class UserAccountServiceImpl implements IUserAccountService{
-    private static IUserAccountDao userAccountDao=new UserAccountDaoImpl();
+public class UserAccountServiceImpl implements IUserAccountService {
+
+    private IUserAccountDao userAccountDao = new UserAccountDaoImpl();
+
     @Override
     public boolean addUserAccount(UserAccount userAccount) {
-
         return userAccountDao.addUserAccount(userAccount);
     }
 
     @Override
     public boolean updateUserAccount(UserAccount userAccount) {
-        return false;
+        return userAccountDao.updateUserAccount(userAccount);
     }
 
     @Override
     public boolean deleteUserAccount(int userId) {
-        return false;
+        return userAccountDao.deleteUserAccount(userId);
     }
 
     @Override
     public UserAccount getUserAccount(int userId) {
-        return null;
+        return userAccountDao.getUserAccount(userId);
     }
 
     @Override
     public List<UserAccount> getAllUserAccounts() {
-        return List.of();
+        return userAccountDao.getAllUserAccounts();
     }
 }
-
