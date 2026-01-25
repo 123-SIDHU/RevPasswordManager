@@ -3,7 +3,6 @@ package com.revpasswordmanager.util;
 import java.util.Base64;
 
 public class PasswordUtil {
-
     public static String hash(String password) {
         return Base64.getEncoder().encodeToString(password.getBytes());
     }

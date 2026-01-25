@@ -1,15 +1,356 @@
 package com.revpasswordmanager.service;
 
+import com.revpasswordmanager.dao.PasswordDao;
+import com.revpasswordmanager.dao.UserDao;
+import com.revpasswordmanager.model.Credential;
+import com.revpasswordmanager.model.SecurityQuestion;
+import com.revpasswordmanager.model.User;
+import com.revpasswordmanager.util.CryptoUtil;
+import com.revpasswordmanager.util.ConsoleUtil;
+import com.revpasswordmanager.util.DatabaseConnection;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Base64;
 import java.util.List;
-import com.revpasswordmanager.model.PasswordEntry;
+import java.util.Scanner;
+import java.util.UUID;
 
-public interface IPasswordEntryService {
+public class PasswordManagerService {
+    private static final Logger logger = LogManager.getLogger(PasswordManagerService.class);
+    private UserDao userDao;
+    private PasswordDao passwordDao;
+    private User currentUser;
+    private byte[] encryptionKey; // Derived from master password, in-memory only
 
-    void addPassword(PasswordEntry entry);
+    public PasswordManagerService() {
+        Connection connection = DatabaseConnection.getConnection();
+        this.userDao = new UserDao(connection);
+        this.passwordDao = new PasswordDao(connection);
+    }
 
-    List<PasswordEntry> viewPasswords(int userId);
+    public void registerUser(Scanner scanner) {
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine();
+        String masterPassword = ConsoleUtil.getPasswordInput(scanner, "Enter master password: ");
+        String name = ConsoleUtil.getStringInput(scanner, "Enter name: ");
+        String email = ConsoleUtil.getStringInput(scanner, "Enter email: ");
 
-    void updatePassword(PasswordEntry entry);
+        String hashedMasterPassword = CryptoUtil.hashPassword(masterPassword);
+        User user = new User(username, hashedMasterPassword, name, email);
+        try {
+            userDao.createUser(user);
+            logger.info("User registered: {}", username);
+            System.out.println("User registered successfully. Now add security questions.");
 
-    void deletePassword(int entryId);
+            // Fetch the user again to get the generated ID
+            User savedUser = userDao.getUserByUsername(username);
+            if (savedUser != null) {
+                addSecurityQuestions(scanner, savedUser.getId());
+            } else {
+                logger.error("Error retrieving registered user for security questions");
+            }
+        } catch (SQLException e) {
+            logger.error("Error registering user", e);
+            System.out.println("Error registering user.");
+        }
+    }
+
+    public boolean loginUser(Scanner scanner) {
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine();
+        String masterPassword = ConsoleUtil.getPasswordInput(scanner, "Enter master password: ");
+
+        try {
+            User user = userDao.getUserByUsername(username);
+            if (user != null && CryptoUtil.verifyPassword(masterPassword, user.getMasterPasswordHash())) {
+                currentUser = user;
+                encryptionKey = CryptoUtil.deriveKey(masterPassword);
+                logger.info("User logged in: {}", username);
+                return true;
+            } else {
+                System.out.println("Invalid credentials.");
+                return false;
+            }
+        } catch (SQLException e) {
+            logger.error("Error during login", e);
+            return false;
+        }
+    }
+
+    public void generatePassword(Scanner scanner) {
+        int length = ConsoleUtil.getIntInput(scanner, "Enter password length: ");
+        boolean useUpper = ConsoleUtil.getBooleanInput(scanner, "Include uppercase? (y/n): ");
+        boolean useDigits = ConsoleUtil.getBooleanInput(scanner, "Include digits? (y/n): ");
+        boolean useSpecial = ConsoleUtil.getBooleanInput(scanner, "Include special chars? (y/n): ");
+
+        String chars = "abcdefghijklmnopqrstuvwxyz";
+        if (useUpper)
+            chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if (useDigits)
+            chars += "0123456789";
+        if (useSpecial)
+            chars += "!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+        SecureRandom random = new SecureRandom();
+        StringBuilder password = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            password.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        System.out.println("Generated password: " + password);
+    }
+
+    public void addCredential(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        String accountName = ConsoleUtil.getStringInput(scanner, "Account name: ");
+        String credUsername = ConsoleUtil.getStringInput(scanner, "Username: ");
+        String password = ConsoleUtil.getPasswordInput(scanner, "Password: ");
+        String url = ConsoleUtil.getStringInput(scanner, "URL (optional): ");
+        String notes = ConsoleUtil.getStringInput(scanner, "Notes (optional): ");
+
+        String encryptedPassword = CryptoUtil.encrypt(password, encryptionKey);
+        Credential credential = new Credential(currentUser.getId(), accountName, credUsername, encryptedPassword, url,
+                notes);
+        try {
+            passwordDao.addCredential(credential);
+            logger.info("Credential added for account: {}", accountName);
+            System.out.println("Credential added.");
+        } catch (SQLException e) {
+            logger.error("Error adding credential", e);
+        }
+    }
+
+    public void listCredentials() {
+        if (currentUser == null)
+            return;
+        try {
+            List<Credential> credentials = passwordDao.getCredentialsByUserId(currentUser.getId());
+            if (credentials.isEmpty()) {
+                System.out.println("No credentials found.");
+            } else {
+                System.out.println("Credentials:");
+                for (Credential cred : credentials) {
+                    System.out.println("ID: " + cred.getId() + ", Account: " + cred.getAccountName() + ", Username: "
+                            + cred.getUsername());
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error listing credentials", e);
+        }
+    }
+
+    public void viewCredential(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        String reEnterMaster = ConsoleUtil.getPasswordInput(scanner, "Re-enter master password: ");
+        if (!CryptoUtil.verifyPassword(reEnterMaster, currentUser.getMasterPasswordHash())) {
+            System.out.println("Incorrect master password.");
+            return;
+        }
+
+        int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID: ");
+        try {
+            Credential cred = passwordDao.getCredentialById(credId, currentUser.getId());
+            if (cred != null) {
+                String decryptedPassword = CryptoUtil.decrypt(cred.getEncryptedPassword(), encryptionKey);
+                System.out.println("Account: " + cred.getAccountName());
+                System.out.println("Username: " + cred.getUsername());
+                System.out.println("Password: " + decryptedPassword);
+                System.out.println("URL: " + cred.getUrl());
+                System.out.println("Notes: " + cred.getNotes());
+            } else {
+                System.out.println("Credential not found.");
+            }
+        } catch (SQLException e) {
+            logger.error("Error viewing credential", e);
+        }
+    }
+
+    // Similarly implement updateCredential, deleteCredential, searchCredential,
+    // updateProfile, changeMasterPassword
+
+    public void updateCredential(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID to update: ");
+        try {
+            Credential cred = passwordDao.getCredentialById(credId, currentUser.getId());
+            if (cred == null) {
+                System.out.println("Credential not found.");
+                return;
+            }
+            // Prompt for new values, encrypt new password if changed
+            String newPassword = ConsoleUtil.getPasswordInput(scanner, "New password (leave blank to keep current): ");
+            if (!newPassword.isEmpty()) {
+                cred.setEncryptedPassword(CryptoUtil.encrypt(newPassword, encryptionKey));
+            }
+            // Update other fields similarly
+            passwordDao.updateCredential(cred);
+            System.out.println("Credential updated.");
+        } catch (SQLException e) {
+            logger.error("Error updating credential", e);
+        }
+    }
+
+    public void deleteCredential(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID to delete: ");
+        try {
+            passwordDao.deleteCredential(credId, currentUser.getId());
+            System.out.println("Credential deleted.");
+        } catch (SQLException e) {
+            logger.error("Error deleting credential", e);
+        }
+    }
+
+    public void searchCredential(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        String accountName = ConsoleUtil.getStringInput(scanner, "Enter account name to search: ");
+        try {
+            List<Credential> credentials = passwordDao.searchCredentialsByAccountName(currentUser.getId(), accountName);
+            if (credentials.isEmpty()) {
+                System.out.println("No matching credentials.");
+            } else {
+                for (Credential cred : credentials) {
+                    System.out.println("ID: " + cred.getId() + ", Account: " + cred.getAccountName() + ", Username: "
+                            + cred.getUsername());
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error searching credentials", e);
+        }
+    }
+
+    public void updateProfile(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        String newName = ConsoleUtil.getStringInput(scanner, "New name (leave blank to keep): ");
+        String newEmail = ConsoleUtil.getStringInput(scanner, "New email (leave blank to keep): ");
+        if (!newName.isEmpty())
+            currentUser.setName(newName);
+        if (!newEmail.isEmpty())
+            currentUser.setEmail(newEmail);
+        try {
+            userDao.updateUser(currentUser);
+            System.out.println("Profile updated.");
+        } catch (SQLException e) {
+            logger.error("Error updating profile", e);
+        }
+    }
+
+    public void changeMasterPassword(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        String oldMaster = ConsoleUtil.getPasswordInput(scanner, "Enter old master password: ");
+        if (!CryptoUtil.verifyPassword(oldMaster, currentUser.getMasterPasswordHash())) {
+            System.out.println("Incorrect old password.");
+            return;
+        }
+        String newMaster = ConsoleUtil.getPasswordInput(scanner, "Enter new master password: ");
+        String newHash = CryptoUtil.hashPassword(newMaster);
+        byte[] newKey = CryptoUtil.deriveKey(newMaster);
+
+        // Re-encrypt all credentials with new key
+        try {
+            List<Credential> credentials = passwordDao.getCredentialsByUserId(currentUser.getId());
+            for (Credential cred : credentials) {
+                String decrypted = CryptoUtil.decrypt(cred.getEncryptedPassword(), encryptionKey);
+                String reEncrypted = CryptoUtil.encrypt(decrypted, newKey);
+                cred.setEncryptedPassword(reEncrypted);
+                passwordDao.updateCredential(cred);
+            }
+            currentUser.setMasterPasswordHash(newHash);
+            userDao.updateUser(currentUser);
+            encryptionKey = newKey;
+            System.out.println("Master password changed.");
+        } catch (SQLException e) {
+            logger.error("Error changing master password", e);
+        }
+    }
+
+    private void addSecurityQuestions(Scanner scanner, int userId) {
+        for (int i = 1; i <= 3; i++) { // Assume 3 questions
+            String question = ConsoleUtil.getStringInput(scanner, "Security question " + i + ": ");
+            String answer = ConsoleUtil.getPasswordInput(scanner, "Answer: ");
+            String hashedAnswer = CryptoUtil.hashPassword(answer);
+            SecurityQuestion sq = new SecurityQuestion(userId, question, hashedAnswer);
+            try {
+                userDao.addSecurityQuestion(sq);
+            } catch (SQLException e) {
+                logger.error("Error adding security question", e);
+            }
+        }
+    }
+
+    public void manageSecurityQuestions(Scanner scanner) {
+        if (currentUser == null)
+            return;
+        // List current questions, allow update or add
+        try {
+            List<SecurityQuestion> questions = userDao.getSecurityQuestionsByUserId(currentUser.getId());
+            System.out.println("Current Security Questions:");
+            for (SecurityQuestion q : questions) {
+                System.out.println("ID: " + q.getId() + ", Question: " + q.getQuestion());
+            }
+            // Implement update/delete/add logic here
+        } catch (SQLException e) {
+            logger.error("Error managing security questions", e);
+        }
+    }
+
+    public void recoverPassword(Scanner scanner) {
+        System.out.print("Enter username for recovery: ");
+        String username = scanner.nextLine();
+        try {
+            User user = userDao.getUserByUsername(username);
+            if (user == null) {
+                System.out.println("User not found.");
+                return;
+            }
+            List<SecurityQuestion> questions = userDao.getSecurityQuestionsByUserId(user.getId());
+            boolean verified = true;
+            for (SecurityQuestion q : questions) {
+                System.out.println(q.getQuestion());
+                String answer = ConsoleUtil.getPasswordInput(scanner, "Answer: ");
+                if (!CryptoUtil.verifyPassword(answer, q.getAnswerHash())) {
+                    verified = false;
+                    break;
+                }
+            }
+            if (verified) {
+                String verificationCode = generateVerificationCode();
+                // Simulate sending code (in console: print it)
+                System.out.println("Verification code (simulated email): " + verificationCode);
+                String inputCode = ConsoleUtil.getStringInput(scanner, "Enter verification code: ");
+                if (inputCode.equals(verificationCode)) {
+                    String newMaster = ConsoleUtil.getPasswordInput(scanner, "Enter new master password: ");
+                    // Similar to changeMasterPassword, but without old key (assume re-encrypt with
+                    // new)
+                    // For simplicity, reset all credentials or warn user
+                    System.out.println("Password recovered. Note: Existing credentials may need re-addition.");
+                    String newHash = CryptoUtil.hashPassword(newMaster);
+                    user.setMasterPasswordHash(newHash);
+                    userDao.updateUser(user);
+                } else {
+                    System.out.println("Invalid code.");
+                }
+            } else {
+                System.out.println("Security questions failed.");
+            }
+        } catch (SQLException e) {
+            logger.error("Error during recovery", e);
+        }
+    }
+
+    private String generateVerificationCode() {
+        // 6-digit code, expires after use (in real: store with expiry)
+        SecureRandom random = new SecureRandom();
+        return String.format("%06d", random.nextInt(999999));
+    }
 }
