@@ -42,7 +42,7 @@ public class JdbcUtil {
 
     }
 
-    private JDBCUtil() {}
+    private JdbcUtil() {}
 
     public static Connection getConnection() {
 
