@@ -4,10 +4,10 @@ import com.revpasswordmanager.model.VerificationCode;
 
 import java.sql.*;
 
-public class VerificationCodeDAO {
+public class VerificationCodeDaoImpl implements IVerificationCodeDao {
     private Connection connection;
 
-    public VerificationCodeDAO(Connection connection) {
+    public VerificationCodeDaoImpl(Connection connection) {
         this.connection = connection;
     }
 
@@ -59,3 +59,4 @@ public class VerificationCodeDAO {
         }
     }
 }
+

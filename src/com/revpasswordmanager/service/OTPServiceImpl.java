@@ -1,6 +1,5 @@
 package com.revpasswordmanager.service;
 
-import com.revpasswordmanager.dao.VerificationCodeDAO;
 import com.revpasswordmanager.model.VerificationCode;
 import com.revpasswordmanager.util.DatabaseConnection;
 
@@ -9,11 +8,12 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
-public class OTPService {
+public class OTPServiceImpl implements IOTPService {
     private static final int OTP_LENGTH = 6;
     private static final long OTP_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes
     private SecureRandom random = new SecureRandom();
 
+    @Override
     public String generateOTP(int userId, String purpose) {
         StringBuilder otp = new StringBuilder();
         for (int i = 0; i < OTP_LENGTH; i++) {
@@ -25,7 +25,7 @@ public class OTPService {
 
         Connection connection = DatabaseConnection.getConnection();
         try {
-            VerificationCodeDAO dao = new VerificationCodeDAO(connection);
+            IVerificationCodeDao dao = new VerificationCodeDaoImpl(connection);
             dao.create(code);
             return otp.toString();
         } catch (SQLException e) {
@@ -34,10 +34,11 @@ public class OTPService {
         }
     }
 
+    @Override
     public boolean validateOTP(int userId, String code, String purpose) {
         Connection connection = DatabaseConnection.getConnection();
         try {
-            VerificationCodeDAO dao = new VerificationCodeDAO(connection);
+            IVerificationCodeDao dao = new VerificationCodeDaoImpl(connection);
             VerificationCode validCode = dao.getByCodeAndUser(code, userId);
 
             if (validCode != null && validCode.getPurpose().equals(purpose)) {

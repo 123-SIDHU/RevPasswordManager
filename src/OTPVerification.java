@@ -2,7 +2,6 @@ package com.revpasswordmanager;
 
 import com.revpasswordmanager.dao.UserDao;
 import com.revpasswordmanager.model.User;
-import com.revpasswordmanager.service.OTPService;
 import com.revpasswordmanager.util.DatabaseConnection;
 
 import java.sql.Connection;
