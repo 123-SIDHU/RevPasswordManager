@@ -16,10 +16,8 @@ import org.apache.logging.log4j.Logger;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
-import java.util.UUID;
 
 public class PasswordManagerServiceImpl implements IPasswordManagerService {
     private static final Logger logger = LogManager.getLogger(PasswordManagerServiceImpl.class);
