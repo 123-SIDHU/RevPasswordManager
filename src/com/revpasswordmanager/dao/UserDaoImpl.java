@@ -1,5 +1,6 @@
 package com.revpasswordmanager.dao;
 
+import com.revpasswordmanager.model.SecurityQuestion;
 import com.revpasswordmanager.model.User;
 
 import java.sql.Connection;
@@ -9,12 +10,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.revpasswordmanager.model.SecurityQuestion;
-
-public class UserDao {
+public class UserDaoImpl implements IUserDao {
     private Connection connection;
 
-    public UserDao(Connection connection) {
+    public UserDaoImpl(Connection connection) {
         this.connection = connection;
     }
 
@@ -77,5 +76,38 @@ public class UserDao {
             }
         }
         return questions;
+    }
+
+    public void updateSecurityQuestion(SecurityQuestion sq) throws SQLException {
+        String sql = "UPDATE security_questions SET question = ?, answer_hash = ? WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, sq.getQuestion());
+            pstmt.setString(2, sq.getAnswerHash());
+            pstmt.setInt(3, sq.getId());
+            pstmt.executeUpdate();
+        }
+    }
+
+    public void deleteSecurityQuestion(int id) throws SQLException {
+        String sql = "DELETE FROM security_questions WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            pstmt.executeUpdate();
+        }
+    }
+
+    public SecurityQuestion getSecurityQuestionById(int id) throws SQLException {
+        String sql = "SELECT * FROM security_questions WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                SecurityQuestion q = new SecurityQuestion(rs.getInt("user_id"), rs.getString("question"),
+                        rs.getString("answer_hash"));
+                q.setId(rs.getInt("id"));
+                return q;
+            }
+        }
+        return null;
     }
 }

@@ -1,9 +1,5 @@
 package com.revpasswordmanager.controller;
 
-import com.revpasswordmanager.model.UserAccount;
-import com.revpasswordmanager.service.IUserAccountService;
-import com.revpasswordmanager.service.UserAccountServiceImpl;
-
 import java.util.List;
 
 public class UserAccountController {

@@ -16,7 +16,7 @@ public class UserAccountDaoImpl implements IUserAccountDao {
     public boolean addUserAccount(UserAccount userAccount) {
         String sql = "INSERT INTO user_accounts (user_id, site_name, username, password, notes) VALUES (?, ?, ?, ?, ?)";
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql)) {
+                PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             pstmt.setInt(1, userAccount.getUserId());
             pstmt.setString(2, userAccount.getSiteName());
@@ -36,7 +36,7 @@ public class UserAccountDaoImpl implements IUserAccountDao {
     public boolean updateUserAccount(UserAccount userAccount) {
         String sql = "UPDATE user_accounts SET site_name = ?, username = ?, password = ?, notes = ? WHERE id = ?";
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql)) {
+                PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             pstmt.setString(1, userAccount.getSiteName());
             pstmt.setString(2, userAccount.getUsername());
@@ -56,7 +56,7 @@ public class UserAccountDaoImpl implements IUserAccountDao {
     public boolean deleteUserAccount(int id) {
         String sql = "DELETE FROM user_accounts WHERE id = ?";
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql)) {
+                PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             pstmt.setInt(1, id);
 
@@ -72,7 +72,7 @@ public class UserAccountDaoImpl implements IUserAccountDao {
     public UserAccount getUserAccount(int id) {
         String sql = "SELECT * FROM user_accounts WHERE id = ?";
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql)) {
+                PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             pstmt.setInt(1, id);
             ResultSet rs = pstmt.executeQuery();
@@ -97,8 +97,8 @@ public class UserAccountDaoImpl implements IUserAccountDao {
         List<UserAccount> accounts = new ArrayList<>();
         String sql = "SELECT * FROM user_accounts";
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = con.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 accounts.add(new UserAccount(
