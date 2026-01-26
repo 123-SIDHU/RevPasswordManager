@@ -1,7 +1,9 @@
 package com.revpasswordmanager.service;
 
-import com.revpasswordmanager.dao.PasswordDao;
-import com.revpasswordmanager.dao.UserDao;
+import com.revpasswordmanager.dao.ICredentialDao;
+import com.revpasswordmanager.dao.CredentailDaoImpl;
+import com.revpasswordmanager.dao.IUserDao;
+import com.revpasswordmanager.dao.UserDaoImpl;
 import com.revpasswordmanager.model.Credential;
 import com.revpasswordmanager.model.SecurityQuestion;
 import com.revpasswordmanager.model.User;
@@ -19,17 +21,19 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
 
-public class PasswordManagerService {
-    private static final Logger logger = LogManager.getLogger(PasswordManagerService.class);
-    private UserDao userDao;
-    private PasswordDao passwordDao;
+public class PasswordManagerServiceImpl implements IPasswordManagerService {
+    private static final Logger logger = LogManager.getLogger(PasswordManagerServiceImpl.class);
+    private IUserDao userDao;
+    private ICredentialDao credentialDao;
+    private IOTPService otpService;
     private User currentUser;
-    private byte[] encryptionKey; // Derived from master password, in-memory only
+    private byte[] encryptionKey;
 
-    public PasswordManagerService() {
+    public PasswordManagerServiceImpl() {
         Connection connection = DatabaseConnection.getConnection();
-        this.userDao = new UserDao(connection);
-        this.passwordDao = new PasswordDao(connection);
+        this.userDao = new UserDaoImpl(connection);
+        this.credentialDao = new CredentailDaoImpl(connection);
+        this.otpService = new OTPServiceImpl();
     }
 
     public void registerUser(Scanner scanner) {
@@ -116,7 +120,7 @@ public class PasswordManagerService {
         Credential credential = new Credential(currentUser.getId(), accountName, credUsername, encryptedPassword, url,
                 notes);
         try {
-            passwordDao.addCredential(credential);
+            credentialDao.addCredential(credential);
             logger.info("Credential added for account: {}", accountName);
             System.out.println("Credential added.");
         } catch (SQLException e) {
@@ -128,7 +132,7 @@ public class PasswordManagerService {
         if (currentUser == null)
             return;
         try {
-            List<Credential> credentials = passwordDao.getCredentialsByUserId(currentUser.getId());
+            List<Credential> credentials = credentialDao.getCredentialsByUserId(currentUser.getId());
             if (credentials.isEmpty()) {
                 System.out.println("No credentials found.");
             } else {
@@ -154,7 +158,7 @@ public class PasswordManagerService {
 
         int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID: ");
         try {
-            Credential cred = passwordDao.getCredentialById(credId, currentUser.getId());
+            Credential cred = credentialDao.getCredentialById(credId, currentUser.getId());
             if (cred != null) {
                 String decryptedPassword = CryptoUtil.decrypt(cred.getEncryptedPassword(), encryptionKey);
                 System.out.println("Account: " + cred.getAccountName());
@@ -178,7 +182,7 @@ public class PasswordManagerService {
             return;
         int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID to update: ");
         try {
-            Credential cred = passwordDao.getCredentialById(credId, currentUser.getId());
+            Credential cred = credentialDao.getCredentialById(credId, currentUser.getId());
             if (cred == null) {
                 System.out.println("Credential not found.");
                 return;
@@ -189,7 +193,7 @@ public class PasswordManagerService {
                 cred.setEncryptedPassword(CryptoUtil.encrypt(newPassword, encryptionKey));
             }
             // Update other fields similarly
-            passwordDao.updateCredential(cred);
+            credentialDao.updateCredential(cred);
             System.out.println("Credential updated.");
         } catch (SQLException e) {
             logger.error("Error updating credential", e);
@@ -201,7 +205,7 @@ public class PasswordManagerService {
             return;
         int credId = ConsoleUtil.getIntInput(scanner, "Enter credential ID to delete: ");
         try {
-            passwordDao.deleteCredential(credId, currentUser.getId());
+            credentialDao.deleteCredential(credId, currentUser.getId());
             System.out.println("Credential deleted.");
         } catch (SQLException e) {
             logger.error("Error deleting credential", e);
@@ -213,7 +217,8 @@ public class PasswordManagerService {
             return;
         String accountName = ConsoleUtil.getStringInput(scanner, "Enter account name to search: ");
         try {
-            List<Credential> credentials = passwordDao.searchCredentialsByAccountName(currentUser.getId(), accountName);
+            List<Credential> credentials = credentialDao.searchCredentialsByAccountName(currentUser.getId(),
+                    accountName);
             if (credentials.isEmpty()) {
                 System.out.println("No matching credentials.");
             } else {
@@ -258,12 +263,12 @@ public class PasswordManagerService {
 
         // Re-encrypt all credentials with new key
         try {
-            List<Credential> credentials = passwordDao.getCredentialsByUserId(currentUser.getId());
+            List<Credential> credentials = credentialDao.getCredentialsByUserId(currentUser.getId());
             for (Credential cred : credentials) {
                 String decrypted = CryptoUtil.decrypt(cred.getEncryptedPassword(), encryptionKey);
                 String reEncrypted = CryptoUtil.encrypt(decrypted, newKey);
                 cred.setEncryptedPassword(reEncrypted);
-                passwordDao.updateCredential(cred);
+                credentialDao.updateCredential(cred);
             }
             currentUser.setMasterPasswordHash(newHash);
             userDao.updateUser(currentUser);
@@ -291,16 +296,69 @@ public class PasswordManagerService {
     public void manageSecurityQuestions(Scanner scanner) {
         if (currentUser == null)
             return;
-        // List current questions, allow update or add
-        try {
-            List<SecurityQuestion> questions = userDao.getSecurityQuestionsByUserId(currentUser.getId());
-            System.out.println("Current Security Questions:");
-            for (SecurityQuestion q : questions) {
-                System.out.println("ID: " + q.getId() + ", Question: " + q.getQuestion());
+
+        while (true) {
+            System.out.println("Manage Security Questions:");
+            System.out.println("1. List Questions");
+            System.out.println("2. Add Question");
+            System.out.println("3. Update Question");
+            System.out.println("4. Delete Question");
+            System.out.println("5. Back");
+            System.out.print("Choose an option: ");
+            int choice = ConsoleUtil.getIntInput(scanner);
+
+            try {
+                switch (choice) {
+                    case 1:
+                        List<SecurityQuestion> questions = userDao.getSecurityQuestionsByUserId(currentUser.getId());
+                        if (questions.isEmpty()) {
+                            System.out.println("No security questions found.");
+                        } else {
+                            for (SecurityQuestion q : questions) {
+                                System.out.println("ID: " + q.getId() + ", Question: " + q.getQuestion());
+                            }
+                        }
+                        break;
+                    case 2:
+                        String question = ConsoleUtil.getStringInput(scanner, "Enter new question: ");
+                        String answer = ConsoleUtil.getPasswordInput(scanner, "Enter answer: ");
+                        String hashedAnswer = CryptoUtil.hashPassword(answer);
+                        SecurityQuestion newSq = new SecurityQuestion(currentUser.getId(), question, hashedAnswer);
+                        userDao.addSecurityQuestion(newSq);
+                        System.out.println("Security question added.");
+                        break;
+                    case 3:
+                        int updateId = ConsoleUtil.getIntInput(scanner, "Enter question ID to update: ");
+                        SecurityQuestion sqToUpdate = userDao.getSecurityQuestionById(updateId);
+                        if (sqToUpdate != null && sqToUpdate.getUserId() == currentUser.getId()) {
+                            String newQ = ConsoleUtil.getStringInput(scanner, "Enter new question: ");
+                            String newA = ConsoleUtil.getPasswordInput(scanner, "Enter new answer: ");
+                            sqToUpdate.setQuestion(newQ);
+                            sqToUpdate.setAnswerHash(CryptoUtil.hashPassword(newA));
+                            userDao.updateSecurityQuestion(sqToUpdate);
+                            System.out.println("Security question updated.");
+                        } else {
+                            System.out.println("Question not found or access denied.");
+                        }
+                        break;
+                    case 4:
+                        int deleteId = ConsoleUtil.getIntInput(scanner, "Enter question ID to delete: ");
+                        SecurityQuestion sqToDelete = userDao.getSecurityQuestionById(deleteId);
+                        if (sqToDelete != null && sqToDelete.getUserId() == currentUser.getId()) {
+                            userDao.deleteSecurityQuestion(deleteId);
+                            System.out.println("Security question deleted.");
+                        } else {
+                            System.out.println("Question not found or access denied.");
+                        }
+                        break;
+                    case 5:
+                        return;
+                    default:
+                        System.out.println("Invalid choice.");
+                }
+            } catch (SQLException e) {
+                logger.error("Error managing security questions", e);
             }
-            // Implement update/delete/add logic here
-        } catch (SQLException e) {
-            logger.error("Error managing security questions", e);
         }
     }
 
@@ -324,11 +382,11 @@ public class PasswordManagerService {
                 }
             }
             if (verified) {
-                String verificationCode = generateVerificationCode();
-                // Simulate sending code (in console: print it)
+                String verificationCode = otpService.generateOTP(user.getId(), "PASSWORD_RECOVERY");
                 System.out.println("Verification code (simulated email): " + verificationCode);
+
                 String inputCode = ConsoleUtil.getStringInput(scanner, "Enter verification code: ");
-                if (inputCode.equals(verificationCode)) {
+                if (otpService.validateOTP(user.getId(), inputCode, "PASSWORD_RECOVERY")) {
                     String newMaster = ConsoleUtil.getPasswordInput(scanner, "Enter new master password: ");
                     // Similar to changeMasterPassword, but without old key (assume re-encrypt with
                     // new)
@@ -348,9 +406,4 @@ public class PasswordManagerService {
         }
     }
 
-    private String generateVerificationCode() {
-        // 6-digit code, expires after use (in real: store with expiry)
-        SecureRandom random = new SecureRandom();
-        return String.format("%06d", random.nextInt(999999));
-    }
 }

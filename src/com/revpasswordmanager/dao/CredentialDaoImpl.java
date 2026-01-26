@@ -9,10 +9,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PasswordDao {
+public class CredentailDaoImpl implements ICredentialDao {
     private Connection connection;
 
-    public PasswordDao(Connection connection) {
+    public CredentailDaoImpl(Connection connection) {
         this.connection = connection;
     }
 
