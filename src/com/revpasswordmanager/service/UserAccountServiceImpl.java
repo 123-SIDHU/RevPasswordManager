@@ -1,7 +1,5 @@
 package com.revpasswordmanager.service;
 
-import com.revpasswordmanager.dao.IUserAccountDao;
-import com.revpasswordmanager.dao.UserAccountDaoImpl;
 import com.revpasswordmanager.model.UserAccount;
 
 import java.util.List;
