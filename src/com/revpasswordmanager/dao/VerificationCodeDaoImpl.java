@@ -1,12 +1,17 @@
 package com.revpasswordmanager.dao;
 
 
-import java.sql.*;
+import com.revpasswordmanager.model.VerificationCode;
 
-public class VerificationCodeDao {
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class VerificationCodeDaoImpl implements IVerificationCodeDao {
     private Connection connection;
 
-    public VerificationCodeDao(Connection connection) {
+    public VerificationCodeDaoImpl(Connection connection) {
         this.connection = connection;
     }
 
