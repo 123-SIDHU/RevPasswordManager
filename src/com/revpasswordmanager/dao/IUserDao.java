@@ -1,7 +1,6 @@
 package com.revpasswordmanager.dao;
 
 import com.revpasswordmanager.model.SecurityQuestion;
-import com.revpasswordmanager.model.User;
 
 import java.sql.SQLException;
 import java.util.List;

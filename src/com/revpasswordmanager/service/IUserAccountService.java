@@ -1,7 +1,5 @@
 package com.revpasswordmanager.service;
 
-import com.revpasswordmanager.model.UserAccount;
-
 import java.util.List;
 
 public interface IUserAccountService {
