@@ -1,25 +1,23 @@
 package com.revpasswordmanager.dao;
 
 import com.revpasswordmanager.model.SecurityQuestion;
-import com.revpasswordmanager.model.User;
 
-import java.sql.SQLException;
 import java.util.List;
 
 public interface IUserDao {
-    void createUser(User user) throws SQLException;
+    void createUser(User user);
 
-    User getUserByUsername(String username) throws SQLException;
+    User getUserByUsername(String username);
 
-    void updateUser(User user) throws SQLException;
+    void updateUser(User user);
 
-    void addSecurityQuestion(SecurityQuestion sq) throws SQLException;
+    void addSecurityQuestion(SecurityQuestion sq);
 
-    List<SecurityQuestion> getSecurityQuestionsByUserId(int userId) throws SQLException;
+    List<SecurityQuestion> getSecurityQuestionsByUserId(int userId);
 
-    void updateSecurityQuestion(SecurityQuestion sq) throws SQLException;
+    void updateSecurityQuestion(SecurityQuestion sq);
 
-    void deleteSecurityQuestion(int id) throws SQLException;
+    void deleteSecurityQuestion(int id);
 
-    SecurityQuestion getSecurityQuestionById(int id) throws SQLException;
+    SecurityQuestion getSecurityQuestionById(int id);
 }

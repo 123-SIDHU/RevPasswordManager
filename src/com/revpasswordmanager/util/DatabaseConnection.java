@@ -1,3 +1,4 @@
+// DB Connection: DatabaseConnection.java
 package com.revpasswordmanager.util;
 
 import org.apache.logging.log4j.LogManager;
@@ -18,10 +19,16 @@ public class DatabaseConnection {
                 try (java.io.InputStream input = DatabaseConnection.class.getClassLoader()
                         .getResourceAsStream("db.properties")) {
                     if (input == null) {
-                        logger.error("Sorry, unable to find db.properties");
-                        return null;
+                        try (java.io.InputStream fileInput = new java.io.FileInputStream(
+                                "src/main/resources/db.properties")) {
+                            props.load(fileInput);
+                        } catch (java.io.IOException e) {
+                            logger.error("Sorry, unable to find db.properties in classpath or file system");
+                            return null;
+                        }
+                    } else {
+                        props.load(input);
                     }
-                    props.load(input);
                 } catch (java.io.IOException ex) {
                     logger.error("Error reading db.properties", ex);
                     return null;

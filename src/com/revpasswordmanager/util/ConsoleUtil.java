@@ -6,21 +6,14 @@ import java.util.Scanner;
 public class ConsoleUtil {
     private static Console console = System.console();
 
-    public static String getPasswordInput(String prompt) {
-        if (console != null) {
-            return new String(console.readPassword(prompt));
-        } else {
-            System.out.print(prompt);
-            return new Scanner(System.in).nextLine(); // Fallback
-        }
-    }
-
     public static String getPasswordInput(Scanner scanner, String prompt) {
         if (console != null) {
-            return new String(console.readPassword(prompt));
+            char[] password = console.readPassword(prompt);
+            return password != null ? new String(password) : "";
         } else {
             System.out.print(prompt);
-            return scanner.nextLine();
+            String line = scanner.nextLine();
+            return line != null ? line : "";
         }
     }
 

@@ -1,4 +1,3 @@
-// Models: User.java, Credential.java, SecurityQuestion.java
 package com.revpasswordmanager.model;
 
 public class User {
@@ -23,7 +22,6 @@ public class User {
         this.email = email;
     }
 
-    // Getters and setters
     public int getId() { return id; }
     public String getUsername() { return username; }
     public String getMasterPasswordHash() { return masterPasswordHash; }
