@@ -12,7 +12,6 @@ public class SecurityQuestion {
         this.answerHash = answerHash;
     }
 
-    // Getters
     public int getId() {
         return id;
     }
@@ -29,7 +28,7 @@ public class SecurityQuestion {
         return answerHash;
     }
 
-    // Setters
+
     public void setId(int id) {
         this.id = id;
     }
