@@ -1,16 +1,19 @@
 package com.revpasswordmanager.service;
 
+import com.revpasswordmanager.dao.IVerificationCodeDao;
+import com.revpasswordmanager.dao.VerificationCodeDaoImpl;
 import com.revpasswordmanager.model.VerificationCode;
 import com.revpasswordmanager.util.DatabaseConnection;
 
+import com.revpasswordmanager.exception.RevPasswordManagerException;
+
 import java.security.SecureRandom;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 
 public class OTPServiceImpl implements IOTPService {
     private static final int OTP_LENGTH = 6;
-    private static final long OTP_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes
+    private static final long OTP_VALIDITY_MS = 5 * 60 * 1000L; // 5 minutes
     private SecureRandom random = new SecureRandom();
 
     @Override
@@ -28,8 +31,9 @@ public class OTPServiceImpl implements IOTPService {
             IVerificationCodeDao dao = new VerificationCodeDaoImpl(connection);
             dao.create(code);
             return otp.toString();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (RevPasswordManagerException e) {
+            e.printStackTrace(); // Consider using Logger here if available, but for now matching existing style
+            // + pattern
             return null;
         }
     }
@@ -45,7 +49,7 @@ public class OTPServiceImpl implements IOTPService {
                 dao.markAsUsed(validCode.getId());
                 return true;
             }
-        } catch (SQLException e) {
+        } catch (RevPasswordManagerException e) {
             e.printStackTrace();
         }
         return false;

@@ -2,14 +2,12 @@ package com.revpasswordmanager.dao;
 
 import com.revpasswordmanager.model.VerificationCode;
 
-import java.sql.SQLException;
-
 public interface IVerificationCodeDao {
-    void create(VerificationCode verificationCode) throws SQLException;
+    void create(VerificationCode verificationCode);
 
-    VerificationCode getByCodeAndUser(String code, int userId) throws SQLException;
+    VerificationCode getByCodeAndUser(String code, int userId);
 
-    void markAsUsed(int id) throws SQLException;
+    void markAsUsed(int id);
 
-    void cleanupExpired() throws SQLException;
+    void cleanupExpired();
 }
