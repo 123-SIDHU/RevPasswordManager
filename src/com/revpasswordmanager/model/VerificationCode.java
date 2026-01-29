@@ -1,5 +1,6 @@
 package com.revpasswordmanager.model;
 
+
 import java.sql.Timestamp;
 
 public class VerificationCode {
@@ -103,3 +104,4 @@ public class VerificationCode {
                 '}';
     }
 }
+
