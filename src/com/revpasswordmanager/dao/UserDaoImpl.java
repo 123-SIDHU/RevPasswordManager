@@ -14,7 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class UserDaoImpl implements IUserDao {
+public class   UserDaoImpl implements IUserDao {
 
     private static final Logger logger = LogManager.getLogger(UserDaoImpl.class);
     private Connection connection;
